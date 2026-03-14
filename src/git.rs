@@ -10,7 +10,7 @@ pub fn init(store_dir: impl AsRef<Path>) -> anyhow::Result<()> {
     let mut command = Command::new("git");
     command.stdin(Stdio::null());
     command.arg("-C");
-    command.arg(&store_dir);
+    command.arg(store_dir);
     command.arg("init");
     let status = command.status()?;
     if !status.success() {
@@ -30,7 +30,7 @@ pub fn add_and_commit(
         let mut command = Command::new("git");
         command.stdin(Stdio::null());
         command.arg("-C");
-        command.arg(&store_dir);
+        command.arg(store_dir);
         command.arg("add");
         for file in files.into_iter() {
             command.arg(file.as_ref());
@@ -44,7 +44,7 @@ pub fn add_and_commit(
         let mut command = Command::new("git");
         command.stdin(Stdio::null());
         command.arg("-C");
-        command.arg(&store_dir);
+        command.arg(store_dir);
         command.arg("commit");
         command.arg("-m");
         command.arg(message);
@@ -67,7 +67,7 @@ pub fn remove_and_commit(
         let mut command = Command::new("git");
         command.stdin(Stdio::null());
         command.arg("-C");
-        command.arg(&store_dir);
+        command.arg(store_dir);
         command.arg("rm");
         for file in files.into_iter() {
             command.arg(file.as_ref());
@@ -81,7 +81,7 @@ pub fn remove_and_commit(
         let mut command = Command::new("git");
         command.stdin(Stdio::null());
         command.arg("-C");
-        command.arg(&store_dir);
+        command.arg(store_dir);
         command.arg("commit");
         command.arg("-m");
         command.arg(message);

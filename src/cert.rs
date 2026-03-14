@@ -56,7 +56,7 @@ fn new_certificate_params(
         }
     };
     params.not_before = SystemTime::now().into();
-    params.not_after = (params.not_before + CERT_EXPIRES_IN).into();
+    params.not_after = params.not_before + CERT_EXPIRES_IN;
     params.serial_number = None;
     params.name_constraints = None;
     params.crl_distribution_points = Vec::new();
@@ -115,7 +115,7 @@ pub fn generate(store_dir: impl AsRef<Path>, config: CertificateConfig) -> anyho
         CertificateConfig::Root { .. } => params.self_signed(&key_pair)?,
         CertificateConfig::Server { parent_cn, .. }
         | CertificateConfig::Client { parent_cn, .. } => {
-            let parent_cn_dir = store_dir.join(&parent_cn);
+            let parent_cn_dir = store_dir.join(parent_cn);
             let parent_key_pem = gpg::decrypt(parent_cn_dir.join(KEY_PEM_GPG))?;
             let parent_cert_pem = fs::read_to_string(parent_cn_dir.join(CERT_PEM))?;
             let parent_key_pair = KeyPair::from_pem(&parent_key_pem)?;
@@ -137,7 +137,7 @@ pub fn generate(store_dir: impl AsRef<Path>, config: CertificateConfig) -> anyho
     }
     fs::create_dir_all(&cn_dir)?;
     fs::write(&cert_pem_file, certificate.pem())?;
-    let recipients = gpg::recipients(&store_dir)?;
+    let recipients = gpg::recipients(store_dir)?;
     gpg::encrypt(
         key_pair.serialize_pem().as_bytes(),
         &key_pem_gpg_file,

@@ -32,7 +32,7 @@ pub fn init_recipients(store_dir: impl AsRef<Path>) -> anyhow::Result<()> {
         std::io::stdout().flush()?;
         let mut answer = String::new();
         std::io::stdin().lock().read_line(&mut answer)?;
-        for s in answer.trim().split_whitespace() {
+        for s in answer.split_whitespace() {
             let number: usize = match s.parse() {
                 Ok(n) => n,
                 Err(e) => {

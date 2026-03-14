@@ -159,11 +159,11 @@ fn main() -> anyhow::Result<()> {
                         ));
                     }
                     let cn = std::mem::take(&mut names[0]);
-                    let parent_cn = parent_common_name.unwrap_or_else(|| root_common_name());
+                    let parent_cn = parent_common_name.unwrap_or_else(root_common_name);
                     CertificateConfig::Client { cn, parent_cn }
                 }
                 CertificateKind::Server => {
-                    let parent_cn = parent_common_name.unwrap_or_else(|| root_common_name());
+                    let parent_cn = parent_common_name.unwrap_or_else(root_common_name);
                     CertificateConfig::Server { names, parent_cn }
                 }
             };
@@ -257,7 +257,7 @@ fn cert_store_dir() -> PathBuf {
     match std::env::var_os("CERT_STORE_DIR") {
         Some(cert_store_dir) => cert_store_dir.into(),
         None => std::env::home_dir()
-            .unwrap_or_else(|| std::env::temp_dir())
+            .unwrap_or_else(std::env::temp_dir)
             .join(".cert-store"),
     }
 }
