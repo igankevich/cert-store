@@ -1,3 +1,6 @@
+#![doc = include_str!("../README.md")]
+#![doc(hidden)]
+
 use std::ffi::OsString;
 use std::io::Write as _;
 use std::os::unix::process::CommandExt;

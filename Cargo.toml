@@ -1,7 +1,20 @@
 [package]
-name = "homecert"
+name = "cert-store"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+homepage = "https://github.com/igankevich/cert-store"
+repository = "https://github.com/igankevich/cert-store"
+documentation = "https://docs.rs/cert-store"
+readme = "README.md"
+description = "CLI-based certificate store. Inspired by Password Store."
+keywords = ["ssl", "git", "pem", "pfx", "pkcs12"]
+categories = ["command-line-utilities", "filesystem"]
+include = ["**/*.rs", "Cargo.toml", "README.md"]
+
+[[bin]]
+name = "cert"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.102"
