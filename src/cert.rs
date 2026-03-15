@@ -55,11 +55,12 @@ fn new_certificate_params(
             cn
         }
     };
-    params.not_before = SystemTime::now().into();
-    params.not_after = params
-        .not_before
+    let now = SystemTime::now();
+    params.not_before = now.into();
+    params.not_after = now
         .checked_add(expires_in)
-        .ok_or_else(|| anyhow!("Expiration period is too large"))?;
+        .ok_or_else(|| anyhow!("Expiration period is too large"))?
+        .into();
     params.serial_number = None;
     params.name_constraints = None;
     params.crl_distribution_points = Vec::new();
