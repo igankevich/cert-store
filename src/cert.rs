@@ -20,7 +20,6 @@ use rcgen::SanType;
 use crate::git;
 use crate::gpg;
 
-const CERT_EXPIRES_IN: Duration = Duration::from_secs(10 * 365 * 24 * 60 * 60);
 pub const CERT_PEM: &str = "cert.pem";
 pub const KEY_PEM_GPG: &str = "key.pem.gpg";
 
@@ -32,6 +31,7 @@ fn to_distinguished_name(cn: String) -> DistinguishedName {
 
 fn new_certificate_params(
     config: &CertificateConfig,
+    expires_in: Duration,
 ) -> anyhow::Result<(CertificateParams, String)> {
     let mut params = CertificateParams::default();
     let cn = match config {
@@ -55,8 +55,12 @@ fn new_certificate_params(
             cn
         }
     };
-    params.not_before = SystemTime::now().into();
-    params.not_after = params.not_before + CERT_EXPIRES_IN;
+    let now = SystemTime::now();
+    params.not_before = now.into();
+    params.not_after = now
+        .checked_add(expires_in)
+        .ok_or_else(|| anyhow!("Expiration period is too large"))?
+        .into();
     params.serial_number = None;
     params.name_constraints = None;
     params.crl_distribution_points = Vec::new();
@@ -106,11 +110,15 @@ impl CertificateConfig {
     }
 }
 
-pub fn generate(store_dir: impl AsRef<Path>, config: CertificateConfig) -> anyhow::Result<()> {
+pub fn generate(
+    store_dir: impl AsRef<Path>,
+    config: CertificateConfig,
+    expires_in: Duration,
+) -> anyhow::Result<()> {
     let kind = config.kind();
     let store_dir = store_dir.as_ref();
     let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)?;
-    let (params, cn) = new_certificate_params(&config)?;
+    let (params, cn) = new_certificate_params(&config, expires_in)?;
     let certificate = match &config {
         CertificateConfig::Root { .. } => params.self_signed(&key_pair)?,
         CertificateConfig::Server { parent_cn, .. }

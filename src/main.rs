@@ -7,6 +7,7 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use clap::Parser;
@@ -20,6 +21,11 @@ mod gpg;
 use self::cert::CERT_PEM;
 use self::cert::CertificateConfig;
 use self::cert::KEY_PEM_GPG;
+
+const ONE_DAY_IN_SECONDS: u64 = 24 * 60 * 60;
+const ONE_YEAR_IN_SECONDS: u64 = 365 * ONE_DAY_IN_SECONDS;
+const TEN_YEARS: Duration = Duration::from_secs(10 * ONE_YEAR_IN_SECONDS);
+const ONE_YEAR: Duration = Duration::from_secs(ONE_YEAR_IN_SECONDS);
 
 #[derive(clap::Parser)]
 struct Args {
@@ -52,13 +58,26 @@ enum CliCommand {
     /// Initialize certificate store.
     ///
     /// You can override store directory with `CERT_STORE_DIR` environment variable.
-    Init,
+    Init {
+        /// Expiration period of the root certificate in days.
+        ///
+        /// Default period is 10 years.
+        #[clap(short = 'd', long = "expires-in", value_parser = parse_days)]
+        expires_in: Option<Duration>,
+    },
 
     /// Generate key pair and leaf/root certificate.
     Insert {
         /// Certificate type.
         #[clap(action, short = 't', long = "type")]
         kind: CertificateKind,
+
+        /// Expiration period in days.
+        ///
+        /// Default period is 10 years for root and client certificates
+        /// and 1 year for server certificates.
+        #[clap(short = 'd', long = "expires-in", value_parser = parse_days)]
+        expires_in: Option<Duration>,
 
         /// Common name of the parent (root) certificate.
         ///
@@ -125,7 +144,7 @@ enum CliCommand {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     match args.command {
-        CliCommand::Init => {
+        CliCommand::Init { expires_in } => {
             let store_dir = cert_store_dir();
             eprintln!("Creating store directory {}", store_dir.display());
             fs::create_dir_all(&store_dir)?;
@@ -133,10 +152,11 @@ fn main() -> anyhow::Result<()> {
             gpg::init_recipients(&store_dir)?;
             let cn = root_common_name();
             let config = CertificateConfig::Root { cn };
-            cert::generate(&store_dir, config)?;
+            cert::generate(&store_dir, config, expires_in.unwrap_or(TEN_YEARS))?;
         }
         CliCommand::Insert {
             kind,
+            expires_in,
             mut names,
             parent_common_name,
         } => {
@@ -170,7 +190,14 @@ fn main() -> anyhow::Result<()> {
                     CertificateConfig::Server { names, parent_cn }
                 }
             };
-            cert::generate(&store_dir, config)?;
+            let expires_in = match expires_in {
+                Some(expires_in) => expires_in,
+                None => match kind {
+                    CertificateKind::Root | CertificateKind::Client => TEN_YEARS,
+                    CertificateKind::Server => ONE_YEAR,
+                },
+            };
+            cert::generate(&store_dir, config, expires_in)?;
         }
         CliCommand::Remove { names } => {
             let store_dir = cert_store_dir();
@@ -240,8 +267,7 @@ fn main() -> anyhow::Result<()> {
         }
         CliCommand::Git { args } => {
             return Err(Command::new("git")
-                .arg("-C")
-                .arg(cert_store_dir())
+                .current_dir(cert_store_dir())
                 .args(args)
                 .exec()
                 .into());
@@ -280,6 +306,19 @@ fn copy_to_clipboard(data: &[u8]) -> anyhow::Result<()> {
         return Err(anyhow!("Copying to clipboard failed"));
     }
     Ok(())
+}
+
+fn parse_days(s: &str) -> anyhow::Result<Duration> {
+    let s = s.trim();
+    let s = match s.strip_suffix("d") {
+        Some(s) => s.trim(),
+        None => s,
+    };
+    let days: u64 = s.parse()?;
+    let secs = days
+        .checked_mul(ONE_DAY_IN_SECONDS)
+        .ok_or_else(|| anyhow!("Value is too large"))?;
+    Ok(Duration::from_secs(secs))
 }
 
 #[global_allocator]
