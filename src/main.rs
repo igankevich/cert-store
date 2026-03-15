@@ -126,11 +126,13 @@ enum CliCommand {
         #[clap(short = 'f', long = "format", default_value = "pem")]
         format: ExportFormat,
 
-        /// Common name.
-        name: String,
-
         /// Output directory.
+        #[clap(short = 'd', long = "output-dir")]
         output_dir: PathBuf,
+
+        /// Names.
+        #[clap(num_args = 1..)]
+        names: Vec<String>,
     },
 
     /// Run `git` command inside store directory.
@@ -232,36 +234,38 @@ fn main() -> anyhow::Result<()> {
         }
         CliCommand::Export {
             format,
-            name,
+            names,
             output_dir,
         } => {
             let store_dir = cert_store_dir();
-            let cn_dir = store_dir.join(&name);
-            let key_pem = gpg::decrypt(cn_dir.join(KEY_PEM_GPG))?;
-            fs::create_dir_all(&output_dir)?;
-            let output_cert_file = output_dir.join(format!("{name}.crt"));
-            let output_key_file = output_dir.join(format!("{name}.key"));
-            let output_pfx_file = output_dir.join(format!("{name}.pfx"));
-            let root_cert_file = store_dir.join(&name).join(CERT_PEM);
-            fs::copy(cn_dir.join(CERT_PEM), &output_cert_file)?;
-            unsafe { libc::umask(0o077) };
-            fs::write(&output_key_file, &key_pem)?;
-            match format {
-                ExportFormat::Pem => {}
-                ExportFormat::Pkcs12 => {
-                    return Err(Command::new("openssl")
-                        .arg("pkcs12")
-                        .arg("-export")
-                        .arg("-out")
-                        .arg(&output_pfx_file)
-                        .arg("-inkey")
-                        .arg(&output_key_file)
-                        .arg("-in")
-                        .arg(&output_cert_file)
-                        .arg("-certfile")
-                        .arg(&root_cert_file)
-                        .exec()
-                        .into());
+            for name in names.into_iter() {
+                let cn_dir = store_dir.join(&name);
+                let key_pem = gpg::decrypt(cn_dir.join(KEY_PEM_GPG))?;
+                fs::create_dir_all(&output_dir)?;
+                let output_cert_file = output_dir.join(format!("{name}.crt"));
+                let output_key_file = output_dir.join(format!("{name}.key"));
+                let output_pfx_file = output_dir.join(format!("{name}.pfx"));
+                let root_cert_file = store_dir.join(&name).join(CERT_PEM);
+                fs::copy(cn_dir.join(CERT_PEM), &output_cert_file)?;
+                unsafe { libc::umask(0o077) };
+                fs::write(&output_key_file, &key_pem)?;
+                match format {
+                    ExportFormat::Pem => {}
+                    ExportFormat::Pkcs12 => {
+                        return Err(Command::new("openssl")
+                            .arg("pkcs12")
+                            .arg("-export")
+                            .arg("-out")
+                            .arg(&output_pfx_file)
+                            .arg("-inkey")
+                            .arg(&output_key_file)
+                            .arg("-in")
+                            .arg(&output_cert_file)
+                            .arg("-certfile")
+                            .arg(&root_cert_file)
+                            .exec()
+                            .into());
+                    }
                 }
             }
         }
