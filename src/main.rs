@@ -21,6 +21,10 @@ use self::cert::CERT_PEM;
 use self::cert::CertificateConfig;
 use self::cert::KEY_PEM_GPG;
 
+const ONE_YEAR_IN_SECONDS: u64 = 365 * 24 * 60 * 60;
+const TEN_YEARS: Duration = Duration::from_secs(10 * ONE_YEAR_IN_SECONDS);
+const ONE_YEAR: Duration = Duration::from_secs(ONE_YEAR_IN_SECONDS);
+
 #[derive(clap::Parser)]
 struct Args {
     #[clap(subcommand)]
@@ -59,6 +63,13 @@ enum CliCommand {
         /// Certificate type.
         #[clap(action, short = 't', long = "type")]
         kind: CertificateKind,
+
+        /// Expiration period in days.
+        ///
+        /// Default period 10 years for root and client certificates
+        /// and 1 year for server certificates.
+        #[clap(short = 'd', long = "expires-in")]
+        expires_in: Option<Duration>,
 
         /// Common name of the parent (root) certificate.
         ///
@@ -137,6 +148,7 @@ fn main() -> anyhow::Result<()> {
         }
         CliCommand::Insert {
             kind,
+            expires_in,
             mut names,
             parent_common_name,
         } => {
@@ -170,7 +182,14 @@ fn main() -> anyhow::Result<()> {
                     CertificateConfig::Server { names, parent_cn }
                 }
             };
-            cert::generate(&store_dir, config)?;
+            let expires_in = match expires_in {
+                Some(expires_in) => expires_in,
+                None => match kind {
+                    CertificateKind::Root | CertificateKind::Client => TEN_YEARS,
+                    CertificateKind::Server => ONE_YEAR,
+                },
+            };
+            cert::generate(&store_dir, config, expires_in)?;
         }
         CliCommand::Remove { names } => {
             let store_dir = cert_store_dir();
@@ -240,8 +259,7 @@ fn main() -> anyhow::Result<()> {
         }
         CliCommand::Git { args } => {
             return Err(Command::new("git")
-                .arg("-C")
-                .arg(cert_store_dir())
+                .current_dir(cert_store_dir())
                 .args(args)
                 .exec()
                 .into());
